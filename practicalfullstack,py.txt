@@ -1,0 +1,204 @@
+mkdir student-api
+cd student-api
+npm init -y
+npm install express
+Create a file named server.js.
+
+2. Code: server.js
+javascript
+
+const express = require("express");
+
+const app = express();
+app.use(express.json());
+
+let students = [];
+let nextId = 1;
+
+// Validate student input
+function isValidStudent({ name, email, age }) {
+  return (
+    typeof name === "string" &&
+    name.trim().length > 0 &&
+    typeof email === "string" &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+    typeof age === "number" &&
+    Number.isInteger(age) &&
+    age > 0
+  );
+}
+
+// POST /students - Create a student
+app.post("/students", (req, res) => {
+  const { name, email, age } = req.body || {};
+
+  if (!isValidStudent({ name, email, age })) {
+    return res.status(400).json({ error: "Invalid input" });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const duplicate = students.some(
+    (student) => student.email.toLowerCase() === normalizedEmail
+  );
+
+  if (duplicate) {
+    return res.status(409).json({
+      error: "Email already exists"
+    });
+  }
+
+  const student = {
+    id: nextId++,
+    name: name.trim(),
+    email: email.trim(),
+    age
+  };
+
+  students.push(student);
+  return res.status(201).json(student);
+});
+
+// GET /students - List all students
+// Optional filter: /students?minAge=18
+app.get("/students", (req, res) => {
+  let result = students;
+
+  if (req.query.minAge !== undefined) {
+    const minAgeText = req.query.minAge;
+    const minAge = Number(minAgeText);
+
+    if (
+      minAgeText.trim() === "" ||
+      !Number.isFinite(minAge) ||
+      minAge < 0
+    ) {
+      return res.status(400).json({ error: "Invalid input" });
+    }
+
+    result = students.filter(
+      (student) => student.age >= minAge
+    );
+  }
+
+  return res.status(200).json(result);
+});
+
+// GET /students/:id - Fetch one student
+app.get("/students/:id", (req, res) => {
+  const id = Number(req.params.id);
+
+  const student = students.find(
+    (student) => student.id === id
+  );
+
+  if (!student) {
+    return res.status(404).json({
+      error: "Student not found"
+    });
+  }
+
+  return res.status(200).json(student);
+});
+
+// DELETE /students/:id - Delete one student
+app.delete("/students/:id", (req, res) => {
+  const id = Number(req.params.id);
+
+  const index = students.findIndex(
+    (student) => student.id === id
+  );
+
+  if (index === -1) {
+    return res.status(404).json({
+      error: "Student not found"
+    });
+  }
+
+  students.splice(index, 1);
+  return res.status(204).end();
+});
+
+// Start the server
+const PORT = 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
+3. Run the API
+bash
+node server.js
+Expected output:
+
+text
+Server running at http://localhost:3000
+4. Test the API
+Use Postman, Thunder Client, or curl.
+
+A. Create a student
+Request:
+
+http
+POST http://localhost:3000/students
+Content-Type: application/json
+Body:
+
+json
+{
+  "name": "Rahul",
+  "email": "rahul@example.com",
+  "age": 20
+}
+Response — 201 Created:
+
+json
+{
+  "id": 1,
+  "name": "Rahul",
+  "email": "rahul@example.com",
+  "age": 20
+}
+B. List all students
+http
+GET http://localhost:3000/students
+Response — 200 OK:
+
+json
+[
+  {
+    "id": 1,
+    "name": "Rahul",
+    "email": "rahul@example.com",
+    "age": 20
+  }
+]
+C. Filter students by age
+http
+GET http://localhost:3000/students?minAge=18
+Returns students whose age is greater than or equal to 18.
+
+D. Fetch a student by ID
+http
+GET http://localhost:3000/students/1
+Returns the student with ID 1, or 404 Not Found if no such student exists.
+
+E. Delete a student
+http
+DELETE http://localhost:3000/students/1
+Response — 204 No Content, with an empty response body.
+
+F. Test validation errors
+Invalid input, such as a missing name or invalid email, returns:
+
+json
+{
+  "error": "Invalid input"
+}
+Duplicate email returns 409 Conflict:
+
+json
+{
+  "error": "Email already exists"
+}
+Important: Records are stored in memory, so they disappear when the server restarts. The nextId counter ensures that deleted IDs are not reused while the server is running.
+
